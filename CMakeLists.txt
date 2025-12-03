@@ -1,0 +1,123 @@
+cmake_minimum_required(VERSION 3.14)
+project(bridge_core)
+
+# C++17 standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
+# Find ONNX Runtime manually (skip broken CMake config)
+# Use ONNXRUNTIME_ROOT_DIR environment variable
+set(ONNXRUNTIME_ROOT_DIR $ENV{ONNXRUNTIME_ROOT_DIR})
+if(NOT ONNXRUNTIME_ROOT_DIR)
+    set(ONNXRUNTIME_ROOT_DIR $ENV{ONNXRUNTIME_ROOT})
+endif()
+
+message(STATUS "Looking for ONNX Runtime in: ${ONNXRUNTIME_ROOT_DIR}")
+
+find_path(ONNXRUNTIME_INCLUDE_DIR
+    NAMES onnxruntime_cxx_api.h
+    PATHS
+        ${ONNXRUNTIME_ROOT_DIR}/include
+        ${ONNXRUNTIME_ROOT_DIR}/include/onnxruntime
+        /usr/local/include/onnxruntime
+        /usr/include/onnxruntime
+    NO_DEFAULT_PATH
+)
+
+find_library(ONNXRUNTIME_LIBRARY
+    NAMES onnxruntime
+    PATHS
+        ${ONNXRUNTIME_ROOT_DIR}/lib
+        ${ONNXRUNTIME_ROOT_DIR}/lib64
+        /usr/local/lib
+        /usr/local/lib64
+        /usr/lib
+        /usr/lib64
+    NO_DEFAULT_PATH
+)
+
+if(ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIBRARY)
+    message(STATUS "Found ONNX Runtime include: ${ONNXRUNTIME_INCLUDE_DIR}")
+    message(STATUS "Found ONNX Runtime library: ${ONNXRUNTIME_LIBRARY}")
+else()
+    message(FATAL_ERROR "ONNX Runtime not found. Please set ONNXRUNTIME_ROOT_DIR environment variable.")
+endif()
+
+# Create library
+add_library(${PROJECT_NAME} SHARED
+    src/core/config_manager.cpp
+    src/core/state_machine.cpp
+    src/core/rl_controller.cpp
+    src/algorithms/algorithm_base.cpp
+    src/algorithms/mod.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${ONNXRUNTIME_INCLUDE_DIR}
+)
+
+target_link_libraries(${PROJECT_NAME}
+    ${ONNXRUNTIME_LIBRARY}
+    yaml-cpp
+)
+
+ament_target_dependencies(${PROJECT_NAME}
+    rclcpp
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    tf2_ros
+)
+
+# Install headers
+install(
+    DIRECTORY include/
+    DESTINATION include
+)
+
+# Install library
+install(
+    TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Export targets
+install(EXPORT ${PROJECT_NAME}Targets
+    FILE ${PROJECT_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION lib/cmake/${PROJECT_NAME}
+)
+
+# Export package
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(${PROJECT_NAME}Targets)
+ament_export_dependencies(
+    rclcpp
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    tf2_ros
+    yaml-cpp
+)
+
+ament_package()
+
