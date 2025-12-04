@@ -151,7 +151,7 @@ namespace bridge_core
         // Note: target_positions from algorithm already includes default_pos + action
         if (target_positions.size() == current_command_.motor.q.size())
         {
-            for (int dof_idx : config_.robot.dof_activated)
+            for (int dof_idx : config_.robot.dof_activated_indices)
             {
                 size_t idx = static_cast<size_t>(dof_idx);
                 if (idx < target_positions.size())
@@ -170,10 +170,10 @@ namespace bridge_core
         current_command_.motor.kd = config_.control.fixed_kd;
 
         // Override with RL gains for activated joints
-        // rl_kp/rl_kd are indexed by position in dof_activated array (0 to n-1)
-        for (size_t i = 0; i < config_.robot.dof_activated.size(); ++i)
+        // rl_kp/rl_kd are indexed by position in dof_activated_indices array (0 to n-1)
+        for (size_t i = 0; i < config_.robot.dof_activated_indices.size(); ++i)
         {
-            int dof_idx = config_.robot.dof_activated[i];
+            int dof_idx = config_.robot.dof_activated_indices[i];
             if (dof_idx >= 0 && static_cast<size_t>(dof_idx) < current_command_.motor.kp.size())
             {
                 if (i < config_.control.rl_kp.size())
@@ -283,10 +283,10 @@ namespace bridge_core
         current_command_.motor.q = config_.control.default_dof_pos;
 
         // Override with RL gains for activated joints only
-        // rl_kp/rl_kd are indexed by position in dof_activated array (0 to n-1)
-        for (size_t i = 0; i < config_.robot.dof_activated.size(); ++i)
+        // rl_kp/rl_kd are indexed by position in dof_activated_indices array (0 to n-1)
+        for (size_t i = 0; i < config_.robot.dof_activated_indices.size(); ++i)
         {
-            int dof_idx = config_.robot.dof_activated[i];
+            int dof_idx = config_.robot.dof_activated_indices[i];
             if (dof_idx >= 0 && static_cast<size_t>(dof_idx) < current_command_.motor.kp.size())
             {
                 if (i < config_.control.rl_kp.size())

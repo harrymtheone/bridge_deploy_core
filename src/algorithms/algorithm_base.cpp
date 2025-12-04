@@ -62,7 +62,7 @@ void AlgorithmBase::initialize(
 }
 
 void AlgorithmBase::initObservations() {
-    num_dof_activated_ = static_cast<int>(robot_config_.dof_activated.size());
+    num_dof_activated_ = static_cast<int>(robot_config_.dof_activated_indices.size());
     
     // Initialize observation struct
     obs_.resize(static_cast<size_t>(num_dof_activated_));
@@ -112,7 +112,7 @@ void AlgorithmBase::computeObservations(
     
     // Joint states (only activated DOFs, scaled)
     for (int i = 0; i < num_dof_activated_; ++i) {
-        int dof_idx = robot_config_.dof_activated[i];
+        int dof_idx = robot_config_.dof_activated_indices[i];
         float dof_pos = state.motor.q[dof_idx];
         float default_pos = control_config_.default_dof_pos[dof_idx];
         
@@ -137,7 +137,7 @@ std::vector<float> AlgorithmBase::computeTargetDofPos() {
     
     // Apply actions to activated DOFs (adding to default positions)
     for (int i = 0; i < num_dof_activated_; ++i) {
-        int dof_idx = robot_config_.dof_activated[i];
+        int dof_idx = robot_config_.dof_activated_indices[i];
         target_dof_pos[dof_idx] += obs_.actions[i];
         msg.data[i] = target_dof_pos[dof_idx];
     }

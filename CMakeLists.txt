@@ -73,6 +73,7 @@ set(BRIDGE_CORE_SOURCES
     src/core/rl_controller.cpp
     src/algorithms/algorithm_base.cpp
     src/algorithms/mod.cpp
+    src/algorithms/dreamwaq.cpp
 )
 
 if(BUILD_MUJOCO_INTERFACE)

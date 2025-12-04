@@ -104,7 +104,8 @@ struct RobotConfig {
     std::string robot_name;
     int num_dof = 0;
     std::vector<std::string> joint_names;
-    std::vector<int> dof_activated;  // Indices of DOFs controlled by RL
+    std::vector<std::string> dof_activated;  // Names of DOFs controlled by RL
+    std::vector<int> dof_activated_indices;  // Resolved indices of DOFs controlled by RL
 };
 
 // Algorithm configuration

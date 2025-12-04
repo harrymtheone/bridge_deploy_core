@@ -45,7 +45,9 @@ public:
 private:
     static RobotConfig loadRobotConfig(const std::string& config_path);
     static AlgorithmConfig loadAlgorithmConfig(const std::string& config_path);
-    static ControlConfig loadControlConfig(const std::string& config_path);
+    static ControlConfig loadControlConfig(const std::string& config_path,
+                                           const std::vector<std::string>& joint_names,
+                                           const std::vector<std::string>& dof_activated);
     static void applyParameterOverrides(Config& config, const rclcpp::Node::SharedPtr& node);
 };
 

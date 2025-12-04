@@ -1,5 +1,6 @@
 #include "bridge_core/core/config_manager.hpp"
 #include <yaml-cpp/yaml.h>
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
 #include <stdexcept>
@@ -15,7 +16,7 @@ Config ConfigManager::loadConfig(const std::string& config_path,
     Config config;
     config.robot = loadRobotConfig(config_path);
     config.algorithm = loadAlgorithmConfig(config_path);
-    config.control = loadControlConfig(config_path);
+    config.control = loadControlConfig(config_path, config.robot.joint_names, config.robot.dof_activated);
 
     // Apply ROS parameter overrides if node provided
     if (node) {
@@ -46,7 +47,18 @@ RobotConfig ConfigManager::loadRobotConfig(const std::string& config_path) {
     }
 
     if (robot_node["dof_activated"]) {
-        config.dof_activated = robot_node["dof_activated"].as<std::vector<int>>();
+        config.dof_activated = robot_node["dof_activated"].as<std::vector<std::string>>();
+        
+        // Resolve joint names to indices
+        for (const auto& joint_name : config.dof_activated) {
+            auto it = std::find(config.joint_names.begin(), config.joint_names.end(), joint_name);
+            if (it != config.joint_names.end()) {
+                config.dof_activated_indices.push_back(
+                    static_cast<int>(std::distance(config.joint_names.begin(), it)));
+            } else {
+                throw std::runtime_error("dof_activated joint not found in joint_names: " + joint_name);
+            }
+        }
     }
 
     return config;
@@ -123,7 +135,10 @@ AlgorithmConfig ConfigManager::loadAlgorithmConfig(const std::string& config_pat
     return config;
 }
 
-ControlConfig ConfigManager::loadControlConfig(const std::string& config_path) {
+ControlConfig ConfigManager::loadControlConfig(
+    const std::string& config_path,
+    const std::vector<std::string>& joint_names,
+    const std::vector<std::string>& dof_activated) {
     YAML::Node yaml = YAML::LoadFile(config_path);
     ControlConfig config;
 
@@ -133,20 +148,43 @@ ControlConfig ConfigManager::loadControlConfig(const std::string& config_path) {
 
     auto ctrl_node = yaml["control"];
 
+    // Helper to parse a map of joint_name -> value into a vector ordered by joint_names
+    auto parseJointMap = [&](const YAML::Node& node, const std::vector<std::string>& names) 
+        -> std::vector<float> {
+        std::vector<float> result(names.size(), 0.0f);
+        if (node && node.IsMap()) {
+            for (const auto& pair : node) {
+                std::string joint_name = pair.first.as<std::string>();
+                float value = pair.second.as<float>();
+                auto it = std::find(names.begin(), names.end(), joint_name);
+                if (it != names.end()) {
+                    size_t idx = static_cast<size_t>(std::distance(names.begin(), it));
+                    result[idx] = value;
+                } else {
+                    throw std::runtime_error("Joint not found in joint list: " + joint_name);
+                }
+            }
+        }
+        return result;
+    };
+
+    // Parse RL gains (ordered by dof_activated)
     if (ctrl_node["rl_kp"]) {
-        config.rl_kp = ctrl_node["rl_kp"].as<std::vector<float>>();
+        config.rl_kp = parseJointMap(ctrl_node["rl_kp"], dof_activated);
     }
     if (ctrl_node["rl_kd"]) {
-        config.rl_kd = ctrl_node["rl_kd"].as<std::vector<float>>();
+        config.rl_kd = parseJointMap(ctrl_node["rl_kd"], dof_activated);
     }
+    
+    // Parse fixed gains and default positions (ordered by joint_names)
     if (ctrl_node["fixed_kp"]) {
-        config.fixed_kp = ctrl_node["fixed_kp"].as<std::vector<float>>();
+        config.fixed_kp = parseJointMap(ctrl_node["fixed_kp"], joint_names);
     }
     if (ctrl_node["fixed_kd"]) {
-        config.fixed_kd = ctrl_node["fixed_kd"].as<std::vector<float>>();
+        config.fixed_kd = parseJointMap(ctrl_node["fixed_kd"], joint_names);
     }
     if (ctrl_node["default_dof_pos"]) {
-        config.default_dof_pos = ctrl_node["default_dof_pos"].as<std::vector<float>>();
+        config.default_dof_pos = parseJointMap(ctrl_node["default_dof_pos"], joint_names);
     }
 
     config.stand_up_time = ctrl_node["stand_up_time"].as<float>(2.5f);
