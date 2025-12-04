@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <yaml-cpp/yaml.h>
 
 namespace bridge_core {
 
@@ -129,6 +130,9 @@ struct AlgorithmConfig {
     // Command scaling
     std::array<float, 3> commands_scale = {0.0f, 0.0f, 0.0f};
     std::array<float, 3> joystick_scale = {0.0f, 0.0f, 0.0f};
+    
+    // Raw YAML for algorithm-specific parameters
+    YAML::Node yaml;
 };
 
 // Control configuration

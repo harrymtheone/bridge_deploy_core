@@ -1,11 +1,32 @@
 #include "bridge_core/algorithms/dreamwaq.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace bridge_core {
 
 void DreamWAQ::initObservations() {
     AlgorithmBase::initObservations();
+    
+    // Load DreamWAQ-specific parameters from algorithm YAML node
+    auto requireParam = [&](const std::string& key) {
+        if (!config_.yaml[key]) {
+            throw std::runtime_error("Missing required DreamWAQ parameter: " + key);
+        }
+    };
+    
+    requireParam("gait_cycle_time");
+    requireParam("sw_switch");
+    requireParam("sw_lin_cmd_thresh");
+    requireParam("sw_yaw_cmd_thresh");
+    
+    gait_cycle_time_ = config_.yaml["gait_cycle_time"].as<float>();
+    sw_switch_ = config_.yaml["sw_switch"].as<bool>();
+    lin_cmd_thresh_ = config_.yaml["sw_lin_cmd_thresh"].as<float>();
+    yaw_cmd_thresh_ = config_.yaml["sw_yaw_cmd_thresh"].as<float>();
+    
+    RCLCPP_INFO(node_->get_logger(), "DreamWAQ params: cycle_time=%.2f, sw_switch=%s, lin_thresh=%.2f, yaw_thresh=%.2f",
+                gait_cycle_time_, sw_switch_ ? "true" : "false", lin_cmd_thresh_, yaw_cmd_thresh_);
     
     // Proprio size: ang_vel(3) + gravity(3) + clock(2) + commands(3) + dof_pos(n) + dof_vel(n) + actions(n)
     // For G1 with 15 activated DOFs: 3 + 3 + 2 + 3 + 15 + 15 + 15 = 56
@@ -49,7 +70,7 @@ std::pair<float, float> DreamWAQ::computeClockSignals() {
     float lin_cmd_norm = std::sqrt(obs_.commands[0] * obs_.commands[0] + 
                                    obs_.commands[1] * obs_.commands[1]);
     float yaw_cmd = std::abs(obs_.commands[2]);
-    bool is_zero_command = (lin_cmd_norm < lin_cmd_thresh) && (yaw_cmd < yaw_cmd_thresh);
+    bool is_zero_command = (lin_cmd_norm < lin_cmd_thresh_) && (yaw_cmd < yaw_cmd_thresh_);
     
     // If stand-walk switch is enabled and command is zero, keep phase at zero
     if (sw_switch_ && is_zero_command) {

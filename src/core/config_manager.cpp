@@ -132,6 +132,9 @@ AlgorithmConfig ConfigManager::loadAlgorithmConfig(const std::string& config_pat
     }
             config.joystick_scale = {joy_scale[0], joy_scale[1], joy_scale[2]};
 
+    // Store algorithm YAML node for algorithm-specific parameters
+    config.yaml = alg_node;
+
     return config;
 }
 

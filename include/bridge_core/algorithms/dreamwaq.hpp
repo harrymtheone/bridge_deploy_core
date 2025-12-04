@@ -65,12 +65,14 @@ private:
     static constexpr int64_t kBatchSize = 1;         // Batch size for inference
     
     // Gait phase tracking (uses absolute time for accuracy)
-    float gait_cycle_time_ = 0.8f;  // seconds (one full gait cycle)
-    bool sw_switch_ = true;
-    float lin_cmd_thresh = 0.2f;
-    float yaw_cmd_thresh = 0.2f;
     std::chrono::steady_clock::time_point start_time_;
     bool time_initialized_ = false;
+    
+    // DreamWAQ-specific parameters (loaded from "dreamwaq" section in config YAML)
+    float gait_cycle_time_ = 0.8f;   // seconds (one full gait cycle)
+    bool sw_switch_ = true;          // Enable stand-walk switch
+    float lin_cmd_thresh_ = 0.2f;    // Linear command threshold for standing
+    float yaw_cmd_thresh_ = 0.2f;    // Yaw command threshold for standing
 };
 
 } // namespace bridge_core
