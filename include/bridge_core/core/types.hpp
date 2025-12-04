@@ -111,24 +111,23 @@ struct RobotConfig {
 struct AlgorithmConfig {
     std::string name;
     std::string model_path;
-    float dt = 0.002f;
-    int decimation = 10;
+    float dt = 0.0f;
+    int decimation = 0;
     
     // Scaling factors
-    float action_scale = 0.5f;
-    float lin_vel_scale = 2.0f;
-    float ang_vel_scale = 1.0f;
-    float dof_pos_scale = 1.0f;
-    float dof_vel_scale = 0.05f;
-    float clip_obs = 100.0f;
+    float action_scale = 0.0f;
+    float lin_vel_scale = 0.0f;
+    float ang_vel_scale = 0.0f;
+    float dof_pos_scale = 0.0f;
+    float dof_vel_scale = 0.0f;
+    float clip_obs = 0.0f;
     
     // Action limits
-    float clip_actions_lower = -100.0f;
-    float clip_actions_upper = 100.0f;
-    
+    float clip_actions_lower = 0.0f;
+    float clip_actions_upper = 0.0f;
     // Command scaling
-    std::array<float, 3> commands_scale = {0.4f, 0.4f, 0.8f};
-    std::array<float, 3> joystick_scale = {0.4f, 0.4f, 0.8f};
+    std::array<float, 3> commands_scale = {0.0f, 0.0f, 0.0f};
+    std::array<float, 3> joystick_scale = {0.0f, 0.0f, 0.0f};
 };
 
 // Control configuration

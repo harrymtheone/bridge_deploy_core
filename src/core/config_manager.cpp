@@ -73,35 +73,52 @@ AlgorithmConfig ConfigManager::loadAlgorithmConfig(const std::string& config_pat
         config.model_path = alg_node["model_path"].as<std::string>("");
     }
 
-    config.dt = alg_node["dt"].as<float>(0.002f);
-    config.decimation = alg_node["decimation"].as<int>(10);
+    // Required algorithm parameters - throw if missing
+    auto requireFloat = [&](const std::string& key) -> float {
+        if (!alg_node[key]) {
+            throw std::runtime_error("Missing required algorithm parameter: " + key);
+        }
+        return alg_node[key].as<float>();
+    };
+    
+    auto requireInt = [&](const std::string& key) -> int {
+        if (!alg_node[key]) {
+            throw std::runtime_error("Missing required algorithm parameter: " + key);
+        }
+        return alg_node[key].as<int>();
+    };
 
-    config.action_scale = alg_node["action_scale"].as<float>(0.5f);
-    config.lin_vel_scale = alg_node["lin_vel_scale"].as<float>(2.0f);
-    config.ang_vel_scale = alg_node["ang_vel_scale"].as<float>(1.0f);
-    config.dof_pos_scale = alg_node["dof_pos_scale"].as<float>(1.0f);
-    config.dof_vel_scale = alg_node["dof_vel_scale"].as<float>(0.05f);
-    config.clip_obs = alg_node["clip_obs"].as<float>(100.0f);
+    config.dt = requireFloat("dt");
+    config.decimation = requireInt("decimation");
 
-    config.clip_actions_lower = alg_node["clip_actions_lower"].as<float>(-100.0f);
-    config.clip_actions_upper = alg_node["clip_actions_upper"].as<float>(100.0f);
+    config.action_scale = requireFloat("action_scale");
+    config.lin_vel_scale = requireFloat("lin_vel_scale");
+    config.ang_vel_scale = requireFloat("ang_vel_scale");
+    config.dof_pos_scale = requireFloat("dof_pos_scale");
+    config.dof_vel_scale = requireFloat("dof_vel_scale");
+    config.clip_obs = requireFloat("clip_obs");
 
-    // Load command scales
-    if (alg_node["commands_scale"]) {
+    config.clip_actions_lower = requireFloat("clip_actions_lower");
+    config.clip_actions_upper = requireFloat("clip_actions_upper");
+
+    // Load command scales (required)
+    if (!alg_node["commands_scale"]) {
+        throw std::runtime_error("Missing required algorithm parameter: commands_scale");
+    }
         auto cmd_scale = alg_node["commands_scale"].as<std::vector<float>>();
-        if (cmd_scale.size() >= 3) {
+    if (cmd_scale.size() < 3) {
+        throw std::runtime_error("commands_scale must have at least 3 values");
+    }
             config.commands_scale = {cmd_scale[0], cmd_scale[1], cmd_scale[2]};
-        }
-    }
 
-    if (alg_node["joystick_scale"]) {
-        auto joy_scale = alg_node["joystick_scale"].as<std::vector<float>>();
-        if (joy_scale.size() >= 3) {
-            config.joystick_scale = {joy_scale[0], joy_scale[1], joy_scale[2]};
-        }
-    } else {
-        config.joystick_scale = config.commands_scale;
+    if (!alg_node["joystick_scale"]) {
+        throw std::runtime_error("Missing required algorithm parameter: joystick_scale");
     }
+        auto joy_scale = alg_node["joystick_scale"].as<std::vector<float>>();
+    if (joy_scale.size() < 3) {
+        throw std::runtime_error("joystick_scale must have at least 3 values");
+    }
+            config.joystick_scale = {joy_scale[0], joy_scale[1], joy_scale[2]};
 
     return config;
 }
