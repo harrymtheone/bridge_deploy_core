@@ -2,6 +2,7 @@
 #define BRIDGE_CORE_MOD_HPP
 
 #include "bridge_core/algorithms/algorithm_base.hpp"
+#include <chrono>
 
 namespace bridge_core {
 
@@ -45,6 +46,14 @@ private:
     static constexpr int64_t kGruNumLayers = 2;
     static constexpr int64_t kGruHiddenSize = 128;
     static constexpr int64_t kGruBatchSize = 1;
+    
+    // Debug mode: set to true to override neural network with reference gait
+    bool debug_mode_ = false;
+    
+    // Gait phase tracking for debug mode (using wall clock)
+    std::chrono::steady_clock::time_point debug_start_time_;
+    bool debug_time_initialized_ = false;
+    float gait_frequency_ = 1.0f;  // Hz
 };
 
 } // namespace bridge_core

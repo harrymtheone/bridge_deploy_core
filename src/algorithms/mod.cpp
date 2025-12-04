@@ -26,6 +26,9 @@ void Mod::reset() {
     // Reset GRU hidden states to zeros
     std::fill(actor_hidden_states_.begin(), actor_hidden_states_.end(), 0.0f);
     
+    // Reset debug mode timer
+    debug_time_initialized_ = false;
+    
     RCLCPP_DEBUG(node_->get_logger(), "Mod: Reset hidden states");
 }
 
@@ -126,6 +129,60 @@ std::vector<float> Mod::forward() {
             std::copy(hidden_data, hidden_data + hidden_total, actor_hidden_states_.begin());
         }
     }
+    
+    ///////////////////////////  Debug  ///////////////////////////
+    // Set debug_mode_ = true in mod.hpp to enable reference gait override
+    
+    if (debug_mode_) {
+        // Initialize start time on first call
+        if (!debug_time_initialized_) {
+            debug_start_time_ = std::chrono::steady_clock::now();
+            debug_time_initialized_ = true;
+        }
+        
+        // Compute elapsed time using wall clock (robust to loop timing issues)
+        auto now = std::chrono::steady_clock::now();
+        float elapsed_sec = std::chrono::duration<float>(now - debug_start_time_).count();
+        
+        // Compute clock signals for left and right legs (anti-phase)
+        float phase = elapsed_sec * gait_frequency_ * 2.0f * static_cast<float>(M_PI);
+        float clock_l = std::sin(phase);
+        float clock_r = std::sin(phase + static_cast<float>(M_PI));  // 180 degrees out of phase
+        
+        // Compute reference DOF positions
+        float scale1 = 0.3f;
+        float scale2 = 2.0f * scale1;
+        
+        // Initialize reference positions to zero
+        std::vector<float> ref_dof_pos(obs_.actions.size(), 0.0f);
+        
+        // Left swing (only use negative part of sine for swing phase)
+        float clock_l_swing = clock_l > 0.0f ? 0.0f : clock_l;
+        if (ref_dof_pos.size() > 5) {
+            ref_dof_pos[1] = clock_l_swing * scale1;   // Left hip pitch
+            ref_dof_pos[4] = -clock_l_swing * scale2;  // Left knee
+            ref_dof_pos[5] = clock_l_swing * scale1;   // Left ankle pitch
+        }
+        
+        // Right swing (only use negative part of sine for swing phase)
+        float clock_r_swing = clock_r > 0.0f ? 0.0f : clock_r;
+        if (ref_dof_pos.size() > 11) {
+            ref_dof_pos[7] = clock_r_swing * scale1;   // Right hip pitch
+            ref_dof_pos[10] = -clock_r_swing * scale2; // Right knee
+            ref_dof_pos[11] = clock_r_swing * scale1;  // Right ankle pitch
+        }
+        
+        // Override neural network actions with reference gait
+        for (size_t i = 0; i < obs_.actions.size() && i < ref_dof_pos.size(); ++i) {
+            obs_.actions[i] = ref_dof_pos[i];
+        }
+        
+        RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+            "Debug mode: time=%.2fs, phase=%.2f, clock_l=%.2f, clock_r=%.2f", 
+            elapsed_sec, phase, clock_l, clock_r);
+    }
+    
+    ///////////////////////////  Debug  ///////////////////////////
     
     return computeTargetDofPos();
 }

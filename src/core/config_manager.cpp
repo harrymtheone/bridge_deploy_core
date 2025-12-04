@@ -173,12 +173,36 @@ bool ConfigManager::validateConfig(const Config& config) {
         return false;
     }
 
-    // Validate control config
+    // Validate control config - all arrays must match num_dof
     size_t num_dof = static_cast<size_t>(config.robot.num_dof);
+    
     if (config.control.default_dof_pos.size() != num_dof) {
         RCLCPP_ERROR(rclcpp::get_logger("ConfigManager"),
                      "default_dof_pos size (%zu) doesn't match num_dof (%d)",
                      config.control.default_dof_pos.size(), config.robot.num_dof);
+        return false;
+    }
+    
+    if (config.control.fixed_kp.size() != num_dof) {
+        RCLCPP_ERROR(rclcpp::get_logger("ConfigManager"),
+                     "fixed_kp size (%zu) doesn't match num_dof (%d)",
+                     config.control.fixed_kp.size(), config.robot.num_dof);
+        return false;
+    }
+    
+    if (config.control.fixed_kd.size() != num_dof) {
+        RCLCPP_ERROR(rclcpp::get_logger("ConfigManager"),
+                     "fixed_kd size (%zu) doesn't match num_dof (%d)",
+                     config.control.fixed_kd.size(), config.robot.num_dof);
+        return false;
+    }
+    
+    // Validate joint_names matches num_dof
+    if (!config.robot.joint_names.empty() && 
+        config.robot.joint_names.size() != num_dof) {
+        RCLCPP_ERROR(rclcpp::get_logger("ConfigManager"),
+                     "joint_names size (%zu) doesn't match num_dof (%d)",
+                     config.robot.joint_names.size(), config.robot.num_dof);
         return false;
     }
 
