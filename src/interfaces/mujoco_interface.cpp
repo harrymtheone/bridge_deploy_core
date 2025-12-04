@@ -61,37 +61,42 @@ namespace bridge_core
         mujoco_ros_msgs::msg::JointControlCmd cmd_msg;
         cmd_msg.header.stamp = node_->now();
 
+        size_t num_joints = config_.joint_names.size();
+
+        // Joint names (for proper mapping on receiver side)
+        cmd_msg.name = config_.joint_names;
+
         // Position commands
-        cmd_msg.position.resize(command.motor.q.size());
-        for (size_t i = 0; i < command.motor.q.size(); ++i)
+        cmd_msg.position.resize(num_joints);
+        for (size_t i = 0; i < num_joints && i < command.motor.q.size(); ++i)
         {
             cmd_msg.position[i] = static_cast<double>(command.motor.q[i]);
         }
 
         // Velocity commands
-        cmd_msg.velocity.resize(command.motor.dq.size());
-        for (size_t i = 0; i < command.motor.dq.size(); ++i)
+        cmd_msg.velocity.resize(num_joints);
+        for (size_t i = 0; i < num_joints && i < command.motor.dq.size(); ++i)
         {
             cmd_msg.velocity[i] = static_cast<double>(command.motor.dq[i]);
         }
 
         // Torque commands
-        cmd_msg.torque.resize(command.motor.tau.size());
-        for (size_t i = 0; i < command.motor.tau.size(); ++i)
+        cmd_msg.torque.resize(num_joints);
+        for (size_t i = 0; i < num_joints && i < command.motor.tau.size(); ++i)
         {
             cmd_msg.torque[i] = static_cast<double>(command.motor.tau[i]);
         }
 
         // Kp gains
-        cmd_msg.kp.resize(command.motor.kp.size());
-        for (size_t i = 0; i < command.motor.kp.size(); ++i)
+        cmd_msg.kp.resize(num_joints);
+        for (size_t i = 0; i < num_joints && i < command.motor.kp.size(); ++i)
         {
             cmd_msg.kp[i] = static_cast<double>(command.motor.kp[i]);
         }
 
         // Kd gains
-        cmd_msg.kd.resize(command.motor.kd.size());
-        for (size_t i = 0; i < command.motor.kd.size(); ++i)
+        cmd_msg.kd.resize(num_joints);
+        for (size_t i = 0; i < num_joints && i < command.motor.kd.size(); ++i)
         {
             cmd_msg.kd[i] = static_cast<double>(command.motor.kd[i]);
         }
