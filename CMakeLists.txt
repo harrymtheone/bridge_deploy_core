@@ -106,7 +106,6 @@ set(BRIDGE_CORE_DEPS
 
 if(BUILD_MUJOCO_INTERFACE)
     list(APPEND BRIDGE_CORE_DEPS std_srvs mujoco_ros_msgs)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC BRIDGE_CORE_MUJOCO_INTERFACE)
 endif()
 
 ament_target_dependencies(${PROJECT_NAME} ${BRIDGE_CORE_DEPS})

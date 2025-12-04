@@ -171,12 +171,12 @@ ControlConfig ConfigManager::loadControlConfig(
         return result;
     };
 
-    // Parse RL gains (ordered by dof_activated)
+    // Parse RL gains (ordered by joint_names - all joints)
     if (ctrl_node["rl_kp"]) {
-        config.rl_kp = parseJointMap(ctrl_node["rl_kp"], dof_activated);
+        config.rl_kp = parseJointMap(ctrl_node["rl_kp"], joint_names);
     }
     if (ctrl_node["rl_kd"]) {
-        config.rl_kd = parseJointMap(ctrl_node["rl_kd"], dof_activated);
+        config.rl_kd = parseJointMap(ctrl_node["rl_kd"], joint_names);
     }
     
     // Parse fixed gains and default positions (ordered by joint_names)

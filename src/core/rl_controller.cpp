@@ -149,43 +149,18 @@ namespace bridge_core
 
         // 2. Apply RL targets for activated joints
         // Note: target_positions from algorithm already includes default_pos + action
-        if (target_positions.size() == current_command_.motor.q.size())
+        for (int dof_idx : config_.robot.dof_activated_indices)
         {
-            for (int dof_idx : config_.robot.dof_activated_indices)
-            {
-                size_t idx = static_cast<size_t>(dof_idx);
-                if (idx < target_positions.size())
-                {
-                    current_command_.motor.q[idx] = target_positions[idx];
-                }
-            }
+            current_command_.motor.q[dof_idx] = target_positions[dof_idx];
         }
 
         // Zero velocity and torque for PD control
         std::fill(current_command_.motor.dq.begin(), current_command_.motor.dq.end(), 0.0f);
         std::fill(current_command_.motor.tau.begin(), current_command_.motor.tau.end(), 0.0f);
 
-        // Set gains: fixed for non-active joints, RL gains for active joints
-        current_command_.motor.kp = config_.control.fixed_kp;
-        current_command_.motor.kd = config_.control.fixed_kd;
-
-        // Override with RL gains for activated joints
-        // rl_kp/rl_kd are indexed by position in dof_activated_indices array (0 to n-1)
-        for (size_t i = 0; i < config_.robot.dof_activated_indices.size(); ++i)
-        {
-            int dof_idx = config_.robot.dof_activated_indices[i];
-            if (dof_idx >= 0 && static_cast<size_t>(dof_idx) < current_command_.motor.kp.size())
-            {
-                if (i < config_.control.rl_kp.size())
-                {
-                    current_command_.motor.kp[dof_idx] = config_.control.rl_kp[i];
-                }
-                if (i < config_.control.rl_kd.size())
-                {
-                    current_command_.motor.kd[dof_idx] = config_.control.rl_kd[i];
-                }
-            }
-        }
+        // In RL_RUNNING mode: use RL gains for all joints
+        current_command_.motor.kp = config_.control.rl_kp;
+        current_command_.motor.kd = config_.control.rl_kd;
     }
 
     void RLController::joystickCallback(const sensor_msgs::msg::Joy::SharedPtr msg)
@@ -276,29 +251,11 @@ namespace bridge_core
     {
         algorithm_->reset();
 
-        // Start with fixed gains for all joints
+        // RL_READY is not RL_RUNNING, use fixed gains
         current_command_.motor.kp = config_.control.fixed_kp;
         current_command_.motor.kd = config_.control.fixed_kd;
 
         current_command_.motor.q = config_.control.default_dof_pos;
-
-        // Override with RL gains for activated joints only
-        // rl_kp/rl_kd are indexed by position in dof_activated_indices array (0 to n-1)
-        for (size_t i = 0; i < config_.robot.dof_activated_indices.size(); ++i)
-        {
-            int dof_idx = config_.robot.dof_activated_indices[i];
-            if (dof_idx >= 0 && static_cast<size_t>(dof_idx) < current_command_.motor.kp.size())
-            {
-                if (i < config_.control.rl_kp.size())
-                {
-                    current_command_.motor.kp[dof_idx] = config_.control.rl_kp[i];
-                }
-                if (i < config_.control.rl_kd.size())
-                {
-                    current_command_.motor.kd[dof_idx] = config_.control.rl_kd[i];
-                }
-            }
-        }
     }
 
     void RLController::onRLRunning([[maybe_unused]] State state)
