@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Build options
+option(BUILD_MUJOCO_INTERFACE "Build the MuJoCo simulation interface" ON)
+
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -15,6 +18,15 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(yaml-cpp REQUIRED)
+
+# MuJoCo interface dependencies (optional)
+if(BUILD_MUJOCO_INTERFACE)
+    find_package(std_srvs REQUIRED)
+    find_package(mujoco_ros_msgs REQUIRED)
+    message(STATUS "MuJoCo interface: ENABLED")
+else()
+    message(STATUS "MuJoCo interface: DISABLED")
+endif()
 
 # Find ONNX Runtime manually (skip broken CMake config)
 # Use ONNXRUNTIME_ROOT_DIR environment variable
@@ -54,14 +66,21 @@ else()
     message(FATAL_ERROR "ONNX Runtime not found. Please set ONNXRUNTIME_ROOT_DIR environment variable.")
 endif()
 
-# Create library
-add_library(${PROJECT_NAME} SHARED
+# Source files
+set(BRIDGE_CORE_SOURCES
     src/core/config_manager.cpp
     src/core/state_machine.cpp
     src/core/rl_controller.cpp
     src/algorithms/algorithm_base.cpp
     src/algorithms/mod.cpp
 )
+
+if(BUILD_MUJOCO_INTERFACE)
+    list(APPEND BRIDGE_CORE_SOURCES src/interfaces/mujoco_interface.cpp)
+endif()
+
+# Create library
+add_library(${PROJECT_NAME} SHARED ${BRIDGE_CORE_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -74,7 +93,8 @@ target_link_libraries(${PROJECT_NAME}
     yaml-cpp
 )
 
-ament_target_dependencies(${PROJECT_NAME}
+# Base dependencies
+set(BRIDGE_CORE_DEPS
     rclcpp
     std_msgs
     sensor_msgs
@@ -82,6 +102,13 @@ ament_target_dependencies(${PROJECT_NAME}
     nav_msgs
     tf2_ros
 )
+
+if(BUILD_MUJOCO_INTERFACE)
+    list(APPEND BRIDGE_CORE_DEPS std_srvs mujoco_ros_msgs)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC BRIDGE_CORE_MUJOCO_INTERFACE)
+endif()
+
+ament_target_dependencies(${PROJECT_NAME} ${BRIDGE_CORE_DEPS})
 
 # Install headers
 install(
@@ -109,7 +136,8 @@ install(EXPORT ${PROJECT_NAME}Targets
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME}Targets)
-ament_export_dependencies(
+# Export dependencies
+set(BRIDGE_CORE_EXPORT_DEPS
     rclcpp
     std_msgs
     sensor_msgs
@@ -118,6 +146,12 @@ ament_export_dependencies(
     tf2_ros
     yaml-cpp
 )
+
+if(BUILD_MUJOCO_INTERFACE)
+    list(APPEND BRIDGE_CORE_EXPORT_DEPS std_srvs mujoco_ros_msgs)
+endif()
+
+ament_export_dependencies(${BRIDGE_CORE_EXPORT_DEPS})
 
 ament_package()
 
