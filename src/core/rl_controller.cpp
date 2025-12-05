@@ -376,9 +376,11 @@ namespace bridge_core
                 
                 if (std::abs(tau) > tau_limit)
                 {
+                    std::string joint_name = (i < config_.robot.joint_names.size()) 
+                        ? config_.robot.joint_names[i] : "unknown";
                     RCLCPP_WARN(rclcpp::get_logger("Safety Check"), 
-                                "joint %zu torque %.1f Nm exceeds limit %.1f Nm",
-                                i, tau, tau_limit);
+                                "joint %zu (%s) torque %.1f Nm exceeds limit %.1f Nm",
+                                i, joint_name.c_str(), tau, tau_limit);
                     return false;
                 }
             }
