@@ -50,6 +50,13 @@ private:
      */
     void updateHistory(const std::vector<float>& proprio);
     
+    /**
+     * @brief Compute reference gait pattern for debugging
+     * Uses sinusoidal motion for hip, knee, and ankle joints
+     * @return Reference joint position deltas
+     */
+    std::vector<float> computeDebugRefGait();
+    
     // Proprioceptive observation vector (56D for G1)
     // [ang_vel(3), gravity(3), clock(2), commands(3), dof_pos(15), dof_vel(15), actions(15)]
     std::vector<float> proprio_;
@@ -73,6 +80,12 @@ private:
     bool sw_switch_ = true;          // Enable stand-walk switch
     float lin_cmd_thresh_ = 0.2f;    // Linear command threshold for standing
     float yaw_cmd_thresh_ = 0.2f;    // Yaw command threshold for standing
+    
+    // Debug mode: use reference gait instead of neural network
+    bool debug_mode_ = true;
+    float debug_scale_1_ = 0.3f;     // Scale for hip and ankle motion
+    float debug_swing_ratio_ = 0.5f; // Air ratio for swing phase
+    float debug_delta_t_ = 0.2f;     // Phase offset
 };
 
 } // namespace bridge_core

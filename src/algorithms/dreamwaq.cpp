@@ -28,6 +28,12 @@ void DreamWAQ::initObservations() {
     RCLCPP_INFO(node_->get_logger(), "DreamWAQ params: cycle_time=%.2f, sw_switch=%s, lin_thresh=%.2f, yaw_thresh=%.2f",
                 gait_cycle_time_, sw_switch_ ? "true" : "false", lin_cmd_thresh_, yaw_cmd_thresh_);
     
+    if (debug_mode_) {
+        RCLCPP_WARN(node_->get_logger(), "DreamWAQ DEBUG MODE ENABLED: Using reference gait instead of neural network!");
+        RCLCPP_INFO(node_->get_logger(), "Debug params: scale=%.2f, swing_ratio=%.2f, delta_t=%.2f",
+                    debug_scale_1_, debug_swing_ratio_, debug_delta_t_);
+    }
+    
     // Proprio size: ang_vel(3) + gravity(3) + clock(2) + commands(3) + dof_pos(n) + dof_vel(n) + actions(n)
     // For G1 with 15 activated DOFs: 3 + 3 + 2 + 3 + 15 + 15 + 15 = 56
     size_t n_proprio = 3 + 3 + 2 + 3 + 3 * static_cast<size_t>(num_dof_activated_);
@@ -119,7 +125,81 @@ void DreamWAQ::updateHistory(const std::vector<float>& proprio) {
     }
 }
 
+std::vector<float> DreamWAQ::computeDebugRefGait() {
+    // Compute phase for left and right legs (180 degrees out of phase)
+    auto now = std::chrono::steady_clock::now();
+    
+    if (!time_initialized_) {
+        start_time_ = now;
+        time_initialized_ = true;
+    }
+    
+    float elapsed_sec = std::chrono::duration<float>(now - start_time_).count();
+    
+    // Phase for left leg (0 to 1)
+    float phase_l = std::fmod(elapsed_sec / gait_cycle_time_, 1.0f);
+    // Phase for right leg (offset by 0.5 for alternating gait)
+    float phase_r = std::fmod(phase_l + 0.5f, 1.0f);
+    
+    // Compute swing phase: clip((phase - delta_t/2) / (swing_ratio - delta_t), 0, 1)
+    auto computeSwingPhase = [&](float phase) -> float {
+        float phase_swing = (phase - debug_delta_t_ / 2.0f) / (debug_swing_ratio_ - debug_delta_t_);
+        return std::clamp(phase_swing, 0.0f, 1.0f);
+    };
+    
+    float phase_swing_l = computeSwingPhase(phase_l);
+    float phase_swing_r = computeSwingPhase(phase_r);
+    
+    // Clock signal: sin(pi * phase_swing)
+    float clock_l = std::sin(static_cast<float>(M_PI) * phase_swing_l);
+    float clock_r = std::sin(static_cast<float>(M_PI) * phase_swing_r);
+    
+    // Initialize actions to zero
+    size_t n_actions = static_cast<size_t>(num_dof_activated_);
+    obs_.actions.resize(n_actions, 0.0f);
+    std::fill(obs_.actions.begin(), obs_.actions.end(), 0.0f);
+    
+    float scale_1 = debug_scale_1_;
+    float scale_2 = 2.0f * scale_1;
+    
+    // Reference motion based on Python code:
+    // Left leg: indices 0 (hip_pitch), 3 (knee), 4 (ankle_pitch)
+    // Right leg: indices 6 (hip_pitch), 9 (knee), 10 (ankle_pitch)
+    // 
+    // ref_dof_pos[:, 0] = -clock[:, 0] * scale_1      (left hip pitch)
+    // ref_dof_pos[:, 3] = clock[:, 0] * scale_2       (left knee)
+    // ref_dof_pos[:, 4] = -clock[:, 0] * scale_1      (left ankle pitch)
+    // ref_dof_pos[:, 6] = -clock[:, 1] * scale_1      (right hip pitch)
+    // ref_dof_pos[:, 9] = clock[:, 1] * scale_2       (right knee)
+    // ref_dof_pos[:, 10] = -clock[:, 1] * scale_1     (right ankle pitch)
+    
+    if (n_actions >= 12) {
+        // Left leg motion
+        obs_.actions[0] = -clock_l * scale_1;   // left hip pitch
+        obs_.actions[3] = clock_l * scale_2;    // left knee
+        obs_.actions[4] = -clock_l * scale_1;   // left ankle pitch
+        
+        // Right leg motion
+        obs_.actions[6] = -clock_r * scale_1;   // right hip pitch
+        obs_.actions[9] = clock_r * scale_2;    // right knee
+        obs_.actions[10] = -clock_r * scale_1;  // right ankle pitch
+    }
+    
+    return computeTargetDofPos();
+}
+
 std::vector<float> DreamWAQ::forward() {
+
+    std::cout << "gravity_proj: "
+    << obs_.gravity_proj[0] << " "
+    << obs_.gravity_proj[1] << " "
+    << obs_.gravity_proj[2] << std::endl;
+
+    // Debug mode: use reference gait instead of neural network
+    if (debug_mode_) {
+        return computeDebugRefGait();
+    }
+    
     // Compute clock signals
     auto [clock_sin, clock_cos] = computeClockSignals();
     
@@ -227,4 +307,3 @@ std::vector<float> DreamWAQ::forward() {
 }
 
 } // namespace bridge_core
-
