@@ -31,16 +31,6 @@ public:
      * @return true if valid
      */
     static bool validateConfig(const Config& config);
-    
-    /**
-     * @brief Find config file by model name in search paths
-     * @param model_name Model name (e.g., "t1_mod")
-     * @param search_paths Directories to search in
-     * @return Full path to config file
-     * @throws std::runtime_error if not found
-     */
-    static std::string findConfigFile(const std::string& model_name,
-                                     const std::vector<std::string>& search_paths);
 
 private:
     static RobotConfig loadRobotConfig(const std::string& config_path);
