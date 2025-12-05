@@ -1,4 +1,5 @@
 #include "bridge_core/core/rl_controller.hpp"
+#include <cmath>
 
 namespace bridge_core
 {
@@ -161,6 +162,13 @@ namespace bridge_core
         // In RL_RUNNING mode: use RL gains for all joints
         current_command_.motor.kp = config_.control.rl_kp;
         current_command_.motor.kd = config_.control.rl_kd;
+
+        // Safety check: stop RL if limits exceeded (after command is computed)
+        if (!checkSafetyLimits(robot_state, current_command_))
+        {
+            state_machine_->processCommand(StateCommand::STOP_RL);
+            return;
+        }
     }
 
     void RLController::joystickCallback(const sensor_msgs::msg::Joy::SharedPtr msg)
@@ -328,6 +336,54 @@ namespace bridge_core
         transform.transform.rotation.z = -robot_state.imu.quaternion[3];
 
         tf_broadcaster_->sendTransform(transform);
+    }
+
+    bool RLController::checkSafetyLimits(const RobotState& robot_state, const RobotCommand& command)
+    {
+        // Check lean angle: max of |roll| and |pitch|
+        // euler[0] = roll, euler[1] = pitch (in radians)
+        constexpr float deg_to_rad = M_PI / 180.0f;
+        float max_lean_rad = config_.safety.max_lean_angle_deg * deg_to_rad;
+        float lean_angle = std::max(std::abs(robot_state.imu.euler[0]), 
+                                    std::abs(robot_state.imu.euler[1]));
+        
+        if (lean_angle > max_lean_rad)
+        {
+            RCLCPP_WARN(rclcpp::get_logger("Safety Check"), 
+                        "lean angle %.1f deg exceeds threshold %.1f deg",
+                        lean_angle / deg_to_rad, config_.safety.max_lean_angle_deg);
+            return false;
+        }
+
+        // Check torque limits using PD controller formula:
+        // tau = kp * (q_target - q_current) + kd * (dq_target - dq_current)
+        // Since dq_target = 0: tau = kp * (q_target - q_current) - kd * dq_current
+        if (!config_.safety.torque_limit.empty())
+        {
+            float scale = config_.safety.torque_limit_scale;
+            size_t num_dof = command.motor.q.size();
+            
+            for (size_t i = 0; i < num_dof; ++i)
+            {
+                float q_error = command.motor.q[i] - robot_state.motor.q[i];
+                float dq = robot_state.motor.dq[i];
+                float kp = command.motor.kp[i];
+                float kd = command.motor.kd[i];
+                
+                float tau = kp * q_error - kd * dq;
+                float tau_limit = config_.safety.torque_limit[i] * scale;
+                
+                if (std::abs(tau) > tau_limit)
+                {
+                    RCLCPP_WARN(rclcpp::get_logger("Safety Check"), 
+                                "joint %zu torque %.1f Nm exceeds limit %.1f Nm",
+                                i, tau, tau_limit);
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
 } // namespace bridge_core

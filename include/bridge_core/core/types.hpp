@@ -148,11 +148,19 @@ struct ControlConfig {
     float sit_down_time = 2.5f;    // Time to sit down (seconds)
 };
 
+// Safety configuration
+struct SafetyConfig {
+    float max_lean_angle_deg = 45.0f;   // Maximum lean angle before stopping RL (degrees)
+    float torque_limit_scale = 1.0f;    // Global scale factor for torque limits
+    std::vector<float> torque_limit;    // Torque limit per joint (Nm)
+};
+
 // Complete configuration structure
 struct Config {
     RobotConfig robot;
     AlgorithmConfig algorithm;
     ControlConfig control;
+    SafetyConfig safety;
 };
 
 // Observation structure for algorithms

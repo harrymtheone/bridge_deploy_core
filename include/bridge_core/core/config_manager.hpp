@@ -48,6 +48,8 @@ private:
     static ControlConfig loadControlConfig(const std::string& config_path,
                                            const std::vector<std::string>& joint_names,
                                            const std::vector<std::string>& dof_activated);
+    static SafetyConfig loadSafetyConfig(const std::string& config_path,
+                                         const std::vector<std::string>& joint_names);
     static void applyParameterOverrides(Config& config, const rclcpp::Node::SharedPtr& node);
 };
 

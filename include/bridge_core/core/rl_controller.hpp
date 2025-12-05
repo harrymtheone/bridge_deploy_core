@@ -76,6 +76,9 @@ private:
     void computeStandUpCommand();
     void computeSitDownCommand();
 
+    // Safety checks
+    bool checkSafetyLimits(const RobotState& robot_state, const RobotCommand& command);
+
     // TF broadcasting
     void publishTF();
 
