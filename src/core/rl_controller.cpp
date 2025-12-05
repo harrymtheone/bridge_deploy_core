@@ -32,6 +32,7 @@ namespace bridge_core
 
         // Initialize command structure with config defaults
         current_command_.resize(static_cast<size_t>(config_.robot.num_dof));
+        current_command_.motor.names = config_.robot.joint_names;
         current_command_.motor.q = config_.control.default_dof_pos;
         current_command_.motor.kp = config_.control.fixed_kp;
         current_command_.motor.kd = config_.control.fixed_kd;

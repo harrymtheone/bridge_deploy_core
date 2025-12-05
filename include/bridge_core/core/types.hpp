@@ -33,13 +33,15 @@ enum class StateCommand : uint8_t {
 
 // Motor command structure
 struct MotorCommand {
-    std::vector<float> q;      // Position
-    std::vector<float> dq;     // Velocity
-    std::vector<float> tau;    // Torque (feedforward)
-    std::vector<float> kp;     // Position gain
-    std::vector<float> kd;     // Velocity gain
+    std::vector<std::string> names;  // Joint names (defines the sequence)
+    std::vector<float> q;            // Position
+    std::vector<float> dq;           // Velocity
+    std::vector<float> tau;          // Torque (feedforward)
+    std::vector<float> kp;           // Position gain
+    std::vector<float> kd;           // Velocity gain
     
     void resize(size_t n) {
+        names.resize(n);
         q.resize(n, 0.0f);
         dq.resize(n, 0.0f);
         tau.resize(n, 0.0f);
@@ -67,13 +69,15 @@ struct IMUState {
 
 // Motor state structure
 struct MotorState {
-    std::vector<float> q;        // Position
-    std::vector<float> dq;       // Velocity
-    std::vector<float> ddq;      // Acceleration
-    std::vector<float> tau_est;  // Estimated torque
-    std::vector<float> cur;      // Current
+    std::vector<std::string> names;  // Joint names (defines the sequence)
+    std::vector<float> q;            // Position
+    std::vector<float> dq;           // Velocity
+    std::vector<float> ddq;          // Acceleration
+    std::vector<float> tau_est;      // Estimated torque
+    std::vector<float> cur;          // Current
     
     void resize(size_t n) {
+        names.resize(n);
         q.resize(n, 0.0f);
         dq.resize(n, 0.0f);
         ddq.resize(n, 0.0f);

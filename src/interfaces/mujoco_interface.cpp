@@ -40,8 +40,9 @@ namespace bridge_core
 
         std::lock_guard<std::mutex> lock(state_mutex_);
         state_.resize(static_cast<size_t>(config.num_dof));
+        state_.motor.names = config.joint_names;
 
-        // Build name-to-index mapping
+        // Build name-to-index mapping for receiving state
         for (size_t i = 0; i < config.joint_names.size(); ++i)
         {
             joint_name_to_idx_[config.joint_names[i]] = static_cast<int>(i);
@@ -61,10 +62,10 @@ namespace bridge_core
         mujoco_ros_msgs::msg::JointControlCmd cmd_msg;
         cmd_msg.header.stamp = node_->now();
 
-        size_t num_joints = config_.joint_names.size();
+        size_t num_joints = command.motor.names.size();
 
         // Joint names (for proper mapping on receiver side)
-        cmd_msg.name = config_.joint_names;
+        cmd_msg.name = command.motor.names;
 
         // Position commands
         cmd_msg.position.resize(num_joints);
