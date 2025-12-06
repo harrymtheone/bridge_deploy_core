@@ -1,7 +1,10 @@
 #include "bridge_core/algorithms/dreamwaq.hpp"
+#include "bridge_core/core/tensor_helpers.hpp"
+#include <array>
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
 namespace bridge_core {
 
@@ -156,8 +159,7 @@ std::vector<float> DreamWAQ::computeDebugRefGait() {
     
     // Initialize actions to zero
     size_t n_actions = static_cast<size_t>(num_dof_activated_);
-    obs_.actions.resize(n_actions, 0.0f);
-    std::fill(obs_.actions.begin(), obs_.actions.end(), 0.0f);
+    std::vector<float> current_actions(n_actions, 0.0f);
     
     float scale_1 = debug_scale_1_;
     float scale_2 = 2.0f * scale_1;
@@ -175,17 +177,20 @@ std::vector<float> DreamWAQ::computeDebugRefGait() {
     
     if (n_actions >= 12) {
         // Left leg motion
-        obs_.actions[0] = -clock_l * scale_1;   // left hip pitch
-        obs_.actions[3] = clock_l * scale_2;    // left knee
-        obs_.actions[4] = -clock_l * scale_1;   // left ankle pitch
+        current_actions[0] = -clock_l * scale_1;   // left hip pitch
+        current_actions[3] = clock_l * scale_2;    // left knee
+        current_actions[4] = -clock_l * scale_1;   // left ankle pitch
         
         // Right leg motion
-        obs_.actions[6] = -clock_r * scale_1;   // right hip pitch
-        obs_.actions[9] = clock_r * scale_2;    // right knee
-        obs_.actions[10] = -clock_r * scale_1;  // right ankle pitch
+        current_actions[6] = -clock_r * scale_1;   // right hip pitch
+        current_actions[9] = clock_r * scale_2;    // right knee
+        current_actions[10] = -clock_r * scale_1;  // right ankle pitch
     }
     
-    return computeTargetDofPos();
+    // Update last_actions
+    obs_.last_actions = current_actions;
+
+    return computeTargetDofPos(current_actions);
 }
 
 std::vector<float> DreamWAQ::forward() {
@@ -203,49 +208,19 @@ std::vector<float> DreamWAQ::forward() {
     // Compute clock signals
     auto [clock_sin, clock_cos] = computeClockSignals();
     
-    // Build proprio observation vector
-    size_t idx = 0;
+    // Build proprio observation vector using fluent API
+    TensorBuilder(proprio_)
+        .add(obs_.ang_vel)       // Angular velocity (3)
+        .add(obs_.gravity_proj)  // Gravity projection (3)
+        .add(clock_sin)          // Clock sin (1)
+        .add(clock_cos)          // Clock cos (1)
+        .add(obs_.commands)      // Commands (3)
+        .add(obs_.dof_pos)       // DOF positions (n)
+        .add(obs_.dof_vel)       // DOF velocities (n)
+        .add(obs_.last_actions)  // Previous actions (n)
+        .clip(-config_.clip_obs, config_.clip_obs);
     
-    // Angular velocity (3) - scaled
-    for (size_t i = 0; i < obs_.ang_vel.size(); ++i) {
-        proprio_[idx++] = obs_.ang_vel[i];
-    }
-    
-    // Gravity projection (3)
-    for (size_t i = 0; i < obs_.gravity_proj.size(); ++i) {
-        proprio_[idx++] = obs_.gravity_proj[i];
-    }
-    
-    // Clock signals (2) - sin and cos for gait timing
-    proprio_[idx++] = clock_sin;
-    proprio_[idx++] = clock_cos;
-    
-    // Commands (3) - scaled
-    for (size_t i = 0; i < obs_.commands.size(); ++i) {
-        proprio_[idx++] = obs_.commands[i];
-    }
-    
-    // DOF positions (n) - scaled
-    for (size_t i = 0; i < obs_.dof_pos.size(); ++i) {
-        proprio_[idx++] = obs_.dof_pos[i];
-    }
-    
-    // DOF velocities (n) - scaled
-    for (size_t i = 0; i < obs_.dof_vel.size(); ++i) {
-        proprio_[idx++] = obs_.dof_vel[i];
-    }
-    
-    // Previous actions (n)
-    for (size_t i = 0; i < obs_.actions.size(); ++i) {
-        proprio_[idx++] = obs_.actions[i];
-    }
-    
-    // Clip observations
-    for (size_t i = 0; i < proprio_.size(); ++i) {
-        proprio_[i] = std::clamp(proprio_[i], -config_.clip_obs, config_.clip_obs);
-    }
-    
-    // Update history buffer with current proprio (before clipping for inference)
+    // Update history buffer with current proprio
     updateHistory(proprio_);
     
     // Prepare ONNX input tensors
@@ -278,23 +253,26 @@ std::vector<float> DreamWAQ::forward() {
     ));
     
     // Run inference
+    static constexpr std::array<const char*, 2> kInputNames = {"proprio", "prop_his"};
+    static constexpr std::array<const char*, 2> kOutputNames = {"actions", "recon"};
+    
     auto output_tensors = ort_session_->Run(
         Ort::RunOptions{nullptr},
-        input_names_.data(),
+        kInputNames.data(),
         input_tensors.data(),
         input_tensors.size(),
-        output_names_.data(),
-        output_names_.size()
+        kOutputNames.data(),
+        kOutputNames.size()
     );
     
-    // Extract actions (output 0: "actions")
-    float* actions_data = output_tensors[0].GetTensorMutableData<float>();
-    auto actions_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
-    size_t output_size = static_cast<size_t>(actions_shape[1]);  // Shape is [1, n]
+    // Extract outputs using TensorExtractor
+    TensorExtractor extractor(output_tensors);
     
-    // Copy output to actions
-    obs_.actions.resize(output_size);
-    std::copy(actions_data, actions_data + output_size, obs_.actions.begin());
+    // Extract actions (output 0: "actions")
+    std::vector<float> current_actions = extractor.extractToVector(0);
+    
+    // Update last_actions for next step
+    obs_.last_actions = current_actions;
     
     // Output 1: "recon" (scan reconstruction) - optional, for debugging
     // Shape: [1, 32, 16] or [-1, 32, 16]
@@ -303,7 +281,7 @@ std::vector<float> DreamWAQ::forward() {
         // For now, we just skip it
     }
     
-    return computeTargetDofPos();
+    return computeTargetDofPos(current_actions);
 }
 
 } // namespace bridge_core

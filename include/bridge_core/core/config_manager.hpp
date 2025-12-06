@@ -25,21 +25,7 @@ public:
     static Config loadConfig(const std::string& config_path,
                             const rclcpp::Node::SharedPtr& node = nullptr);
     
-    /**
-     * @brief Validate configuration completeness
-     * @param config Configuration to validate
-     * @return true if valid
-     */
-    static bool validateConfig(const Config& config);
-
 private:
-    static RobotConfig loadRobotConfig(const std::string& config_path);
-    static AlgorithmConfig loadAlgorithmConfig(const std::string& config_path);
-    static ControlConfig loadControlConfig(const std::string& config_path,
-                                           const std::vector<std::string>& joint_names,
-                                           const std::vector<std::string>& dof_activated);
-    static SafetyConfig loadSafetyConfig(const std::string& config_path,
-                                         const std::vector<std::string>& joint_names);
     static void applyParameterOverrides(Config& config, const rclcpp::Node::SharedPtr& node);
 };
 

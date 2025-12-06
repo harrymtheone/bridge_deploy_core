@@ -82,7 +82,7 @@ private:
     float yaw_cmd_thresh_ = 0.2f;    // Yaw command threshold for standing
     
     // Debug mode: use reference gait instead of neural network
-    bool debug_mode_ = true;
+    bool debug_mode_ = false;
     float debug_scale_1_ = 0.3f;     // Scale for hip and ankle motion
     float debug_swing_ratio_ = 0.5f; // Air ratio for swing phase
     float debug_delta_t_ = 0.2f;     // Phase offset

@@ -40,9 +40,10 @@ public:
 protected:
     /**
      * @brief Compute target joint positions from network output
+     * @param actions Raw actions from the network
      * @return Target positions for all DOFs
      */
-    std::vector<float> computeTargetDofPos();
+    std::vector<float> computeTargetDofPos(const std::vector<float>& actions);
 
     /**
      * @brief Initialize observation tensors
@@ -58,13 +59,6 @@ protected:
     std::unique_ptr<Ort::Env> ort_env_;
     std::unique_ptr<Ort::Session> ort_session_;
     std::unique_ptr<Ort::SessionOptions> session_options_;
-    Ort::AllocatorWithDefaultOptions allocator_;
-
-    // Input/output names
-    std::vector<const char*> input_names_;
-    std::vector<const char*> output_names_;
-    std::vector<std::string> input_name_strings_;
-    std::vector<std::string> output_name_strings_;
 
     // Observations
     Observations obs_;

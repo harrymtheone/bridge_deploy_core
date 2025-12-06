@@ -109,8 +109,7 @@ struct RobotConfig {
     std::string robot_name;
     int num_dof = 0;
     std::vector<std::string> joint_names;
-    std::vector<std::string> dof_activated;  // Names of DOFs controlled by RL
-    std::vector<int> dof_activated_indices;  // Resolved indices of DOFs controlled by RL
+    std::vector<int> dof_activated_ids;  // Resolved indices of DOFs controlled by RL
 };
 
 // Algorithm configuration
@@ -177,7 +176,7 @@ struct Observations {
     std::vector<float> commands;
     std::vector<float> dof_pos;
     std::vector<float> dof_vel;
-    std::vector<float> actions;
+    std::vector<float> last_actions;
     
     void resize(size_t num_dof_activated) {
         lin_vel.resize(3, 0.0f);
@@ -188,7 +187,7 @@ struct Observations {
         commands.resize(3, 0.0f);
         dof_pos.resize(num_dof_activated, 0.0f);
         dof_vel.resize(num_dof_activated, 0.0f);
-        actions.resize(num_dof_activated, 0.0f);
+        last_actions.resize(num_dof_activated, 0.0f);
     }
 };
 

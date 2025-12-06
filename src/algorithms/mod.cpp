@@ -1,4 +1,6 @@
 #include "bridge_core/algorithms/mod.hpp"
+#include "bridge_core/core/tensor_helpers.hpp"
+#include <array>
 #include <cmath>
 #include <algorithm>
 
@@ -33,43 +35,15 @@ void Mod::reset() {
 }
 
 std::vector<float> Mod::forward() {
-    // Concatenate observations into proprio vector
-    size_t idx = 0;
-    
-    // Angular velocity (3)
-    for (size_t i = 0; i < obs_.ang_vel.size(); ++i) {
-        proprio_[idx++] = obs_.ang_vel[i];
-    }
-    
-    // Gravity projection (3)
-    for (size_t i = 0; i < obs_.gravity_proj.size(); ++i) {
-        proprio_[idx++] = obs_.gravity_proj[i];
-    }
-    
-    // Commands (3)
-    for (size_t i = 0; i < obs_.commands.size(); ++i) {
-        proprio_[idx++] = obs_.commands[i];
-    }
-    
-    // DOF positions (n)
-    for (size_t i = 0; i < obs_.dof_pos.size(); ++i) {
-        proprio_[idx++] = obs_.dof_pos[i];
-    }
-    
-    // DOF velocities (n)
-    for (size_t i = 0; i < obs_.dof_vel.size(); ++i) {
-        proprio_[idx++] = obs_.dof_vel[i];
-    }
-    
-    // Previous actions (n)
-    for (size_t i = 0; i < obs_.actions.size(); ++i) {
-        proprio_[idx++] = obs_.actions[i];
-    }
-    
-    // Clip observations
-    for (size_t i = 0; i < proprio_.size(); ++i) {
-        proprio_[i] = std::clamp(proprio_[i], -config_.clip_obs, config_.clip_obs);
-    }
+    // Build proprio observation vector using fluent API
+    TensorBuilder(proprio_)
+        .add(obs_.ang_vel)       // Angular velocity (3)
+        .add(obs_.gravity_proj)  // Gravity projection (3)
+        .add(obs_.commands)      // Commands (3)
+        .add(obs_.dof_pos)       // DOF positions (n)
+        .add(obs_.dof_vel)       // DOF velocities (n)
+        .add(obs_.last_actions)  // Previous actions (n)
+        .clip(-config_.clip_obs, config_.clip_obs);
     
     // Prepare ONNX input tensors
     auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -97,38 +71,29 @@ std::vector<float> Mod::forward() {
     ));
     
     // Run inference
+    static constexpr std::array<const char*, 2> kInputNames = {"proprio", "actor_hidden_states"};
+    static constexpr std::array<const char*, 2> kOutputNames = {"actions", "actor_hidden_states"};
+    
     auto output_tensors = ort_session_->Run(
         Ort::RunOptions{nullptr},
-        input_names_.data(),
+        kInputNames.data(),
         input_tensors.data(),
         input_tensors.size(),
-        output_names_.data(),
-        output_names_.size()
+        kOutputNames.data(),
+        kOutputNames.size()
     );
     
-    // Extract actions (output 0)
-    float* actions_data = output_tensors[0].GetTensorMutableData<float>();
-    auto actions_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
-    size_t output_size = static_cast<size_t>(actions_shape[1]);  // Assuming shape is [1, n]
+    // Extract outputs using TensorExtractor
+    TensorExtractor extractor(output_tensors);
     
-    // Copy output to actions
-    obs_.actions.resize(output_size);
-    std::copy(actions_data, actions_data + output_size, obs_.actions.begin());
+    // Extract actions (output 0)
+    std::vector<float> current_actions = extractor.extractToVector(0);
+    
+    // Update last_actions for next step
+    obs_.last_actions = current_actions;
     
     // Update hidden states (output 1)
-    if (output_tensors.size() > 1) {
-        float* hidden_data = output_tensors[1].GetTensorMutableData<float>();
-        auto hidden_out_shape = output_tensors[1].GetTensorTypeAndShapeInfo().GetShape();
-        size_t hidden_total = 1;
-        for (auto dim : hidden_out_shape) {
-            hidden_total *= static_cast<size_t>(dim);
-        }
-        
-        // Copy updated hidden states
-        if (hidden_total == actor_hidden_states_.size()) {
-            std::copy(hidden_data, hidden_data + hidden_total, actor_hidden_states_.begin());
-        }
-    }
+    extractor.extractTo(1, actor_hidden_states_);
     
     ///////////////////////////  Debug  ///////////////////////////
     // Set debug_mode_ = true in mod.hpp to enable reference gait override
@@ -154,7 +119,7 @@ std::vector<float> Mod::forward() {
         float scale2 = 2.0f * scale1;
         
         // Initialize reference positions to zero
-        std::vector<float> ref_dof_pos(obs_.actions.size(), 0.0f);
+        std::vector<float> ref_dof_pos(current_actions.size(), 0.0f);
         
         // Left swing (only use negative part of sine for swing phase)
         float clock_l_swing = clock_l > 0.0f ? 0.0f : clock_l;
@@ -173,9 +138,11 @@ std::vector<float> Mod::forward() {
         }
         
         // Override neural network actions with reference gait
-        for (size_t i = 0; i < obs_.actions.size() && i < ref_dof_pos.size(); ++i) {
-            obs_.actions[i] = ref_dof_pos[i];
+        for (size_t i = 0; i < current_actions.size() && i < ref_dof_pos.size(); ++i) {
+            current_actions[i] = ref_dof_pos[i];
         }
+        // Also update the last_actions buffer with the overridden values
+        obs_.last_actions = current_actions;
         
         RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
             "Debug mode: time=%.2fs, phase=%.2f, clock_l=%.2f, clock_r=%.2f", 
@@ -184,8 +151,7 @@ std::vector<float> Mod::forward() {
     
     ///////////////////////////  Debug  ///////////////////////////
     
-    return computeTargetDofPos();
+    return computeTargetDofPos(current_actions);
 }
 
 } // namespace bridge_core
-
