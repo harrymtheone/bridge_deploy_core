@@ -224,33 +224,10 @@ std::vector<float> DreamWAQ::forward() {
     updateHistory(proprio_);
     
     // Prepare ONNX input tensors
-    auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    
-    // Input 1: proprio - shape {1, proprio_size}
-    std::vector<int64_t> proprio_shape = {kBatchSize, static_cast<int64_t>(proprio_.size())};
-    
-    // Input 2: prop_his - shape {1, history_len, proprio_size}
-    std::vector<int64_t> prop_his_shape = {
-        kBatchSize, 
-        static_cast<int64_t>(kHistoryLen), 
-        static_cast<int64_t>(proprio_.size())
-    };
-    
-    std::vector<Ort::Value> input_tensors;
-    input_tensors.push_back(Ort::Value::CreateTensor<float>(
-        memory_info,
-        proprio_.data(),
-        proprio_.size(),
-        proprio_shape.data(),
-        proprio_shape.size()
-    ));
-    input_tensors.push_back(Ort::Value::CreateTensor<float>(
-        memory_info,
-        prop_his_flat_.data(),
-        prop_his_flat_.size(),
-        prop_his_shape.data(),
-        prop_his_shape.size()
-    ));
+    auto input_tensors = InputTensorBuilder()
+        .add(proprio_, {kBatchSize, static_cast<int64_t>(proprio_.size())})
+        .add(prop_his_flat_, {kBatchSize, static_cast<int64_t>(kHistoryLen), static_cast<int64_t>(proprio_.size())})
+        .build();
     
     // Run inference
     static constexpr std::array<const char*, 2> kInputNames = {"proprio", "prop_his"};

@@ -46,29 +46,10 @@ std::vector<float> Mod::forward() {
         .clip(-config_.clip_obs, config_.clip_obs);
     
     // Prepare ONNX input tensors
-    auto memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    
-    // Input 1: proprio - shape {1, proprio_size}
-    std::vector<int64_t> proprio_shape = {1, static_cast<int64_t>(proprio_.size())};
-    
-    // Input 2: hidden_states - shape {num_layers, batch_size, hidden_size}
-    std::vector<int64_t> hidden_shape = {kGruNumLayers, kGruBatchSize, kGruHiddenSize};
-    
-    std::vector<Ort::Value> input_tensors;
-    input_tensors.push_back(Ort::Value::CreateTensor<float>(
-        memory_info,
-        proprio_.data(),
-        proprio_.size(),
-        proprio_shape.data(),
-        proprio_shape.size()
-    ));
-    input_tensors.push_back(Ort::Value::CreateTensor<float>(
-        memory_info,
-        actor_hidden_states_.data(),
-        actor_hidden_states_.size(),
-        hidden_shape.data(),
-        hidden_shape.size()
-    ));
+    auto input_tensors = InputTensorBuilder()
+        .add(proprio_, {1, static_cast<int64_t>(proprio_.size())})
+        .add(actor_hidden_states_, {kGruNumLayers, kGruBatchSize, kGruHiddenSize})
+        .build();
     
     // Run inference
     static constexpr std::array<const char*, 2> kInputNames = {"proprio", "actor_hidden_states"};

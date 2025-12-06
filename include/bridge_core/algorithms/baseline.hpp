@@ -2,6 +2,7 @@
 #define BRIDGE_CORE_BASELINE_HPP
 
 #include "bridge_core/algorithms/algorithm_base.hpp"
+#include <chrono>
 
 namespace bridge_core {
 
@@ -43,8 +44,9 @@ private:
     std::vector<float> h_state_;  // Hidden state
     std::vector<float> c_state_;  // Cell state
     
-    // Phase tracking for gait
-    double phase_ = 0.0;           // Current phase [0, 1)
+    // Phase tracking for gait using absolute time
+    std::chrono::steady_clock::time_point start_time_;
+    bool time_initialized_ = false;
     double gait_cycle_time_ = 0.8; // Gait cycle period in seconds
     
     // LSTM configuration

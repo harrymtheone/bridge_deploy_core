@@ -105,6 +105,73 @@ private:
 };
 
 /**
+ * @brief Builder for creating ONNX input tensors from vectors
+ * 
+ * Provides a fluent interface for adding multiple input tensors.
+ * 
+ * Usage:
+ *   auto input_tensors = InputTensorBuilder()
+ *       .add(obs_vec, {1, obs_size})
+ *       .add(h_state, {1, 1, 64})
+ *       .add(c_state, {1, 1, 64})
+ *       .build();
+ */
+class InputTensorBuilder {
+public:
+    InputTensorBuilder() 
+        : memory_info_(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault)) {}
+    
+    /**
+     * @brief Add a tensor from a vector with specified shape
+     * @param data Reference to vector containing tensor data
+     * @param shape Shape of the tensor as initializer list
+     * @return Reference to this for chaining
+     */
+    InputTensorBuilder& add(std::vector<float>& data, std::initializer_list<int64_t> shape) {
+        shapes_.emplace_back(shape);
+        tensors_.push_back(Ort::Value::CreateTensor<float>(
+            memory_info_,
+            data.data(),
+            data.size(),
+            shapes_.back().data(),
+            shapes_.back().size()
+        ));
+        return *this;
+    }
+    
+    /**
+     * @brief Add a tensor from a vector with specified shape vector
+     * @param data Reference to vector containing tensor data
+     * @param shape Shape of the tensor as vector
+     * @return Reference to this for chaining
+     */
+    InputTensorBuilder& add(std::vector<float>& data, const std::vector<int64_t>& shape) {
+        shapes_.push_back(shape);
+        tensors_.push_back(Ort::Value::CreateTensor<float>(
+            memory_info_,
+            data.data(),
+            data.size(),
+            shapes_.back().data(),
+            shapes_.back().size()
+        ));
+        return *this;
+    }
+    
+    /**
+     * @brief Build and return the input tensors
+     * @return Vector of Ort::Value input tensors
+     */
+    std::vector<Ort::Value> build() {
+        return std::move(tensors_);
+    }
+
+private:
+    Ort::MemoryInfo memory_info_;
+    std::vector<std::vector<int64_t>> shapes_;  // Store shapes to keep them alive
+    std::vector<Ort::Value> tensors_;
+};
+
+/**
  * @brief Helper class for extracting data from ONNX output tensors
  */
 class TensorExtractor {
