@@ -110,6 +110,9 @@ struct RobotConfig {
     int num_dof = 0;
     std::vector<std::string> joint_names;
     std::vector<int> dof_activated_ids;  // Resolved indices of DOFs controlled by RL
+    
+    // Raw YAML for robot-specific parameters
+    YAML::Node yaml;
 };
 
 // Algorithm configuration

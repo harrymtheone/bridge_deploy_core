@@ -82,6 +82,9 @@ Config ConfigManager::loadConfig(const std::string &config_path,
         }
     }
 
+    // Store robot YAML node for robot-specific parameters (e.g., imu_source)
+    config.robot.yaml = robot_node;
+
     // ==================== Algorithm Configuration ====================
     auto alg_node = requireNode(yaml, "algorithm", "config");
 
