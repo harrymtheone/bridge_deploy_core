@@ -4,6 +4,7 @@
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joy.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 
@@ -79,8 +80,10 @@ private:
     // Safety checks
     bool checkSafetyLimits(const RobotState& robot_state, const RobotCommand& command);
 
-    // TF broadcasting
+    // Visualization
+    void visualizationLoop();
     void publishTF();
+    void publishJointStates();
 
     // Configuration
     Config config_;
@@ -102,7 +105,9 @@ private:
     // ROS interfaces
     rclcpp::TimerBase::SharedPtr control_timer_;
     rclcpp::TimerBase::SharedPtr rl_timer_;
+    rclcpp::TimerBase::SharedPtr viz_timer_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
     // Timing

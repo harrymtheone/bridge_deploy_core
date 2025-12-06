@@ -149,6 +149,10 @@ struct ControlConfig {
     // Transition parameters
     float stand_up_time = 2.5f;    // Time to stand up (seconds)
     float sit_down_time = 2.5f;    // Time to sit down (seconds)
+    
+    // Visualization
+    bool publish_tf = true;            // Publish TF transforms for RViz
+    bool publish_joint_states = true;  // Publish joint states for RViz
 };
 
 // Safety configuration

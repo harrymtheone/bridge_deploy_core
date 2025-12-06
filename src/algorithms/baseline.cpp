@@ -62,17 +62,6 @@ std::vector<float> Baseline::forward() {
     float sin_phase = static_cast<float>(std::sin(2.0 * M_PI * phase));
     float cos_phase = static_cast<float>(std::cos(2.0 * M_PI * phase));
 
-    obs_.gravity_proj[0] = 0.0f;
-    obs_.gravity_proj[1] = 0.0f;
-    obs_.gravity_proj[2] = -1.0f;
-
-    std::cout <<  "obs_.dof_pos: [" << obs_.dof_pos[0] << ", " << obs_.dof_pos[1] << ", " << obs_.dof_pos[2] << "]" << std::endl;
-    // std::cout <<  "obs_.dof_vel: [" << obs_.dof_vel[0] << ", " << obs_.dof_vel[1] << ", " << obs_.dof_vel[2] << "]" << std::endl;
-    // std::cout <<  "obs_.last_actions: [" << obs_.last_actions[0] << ", " << obs_.last_actions[1] << ", " << obs_.last_actions[2] << "]" << std::endl;
-    // std::cout <<  "sin_phase: [" << sin_phase << ", " << cos_phase << "]" << std::endl;
-    // std::cout <<  "cos_phase: [" << cos_phase << "]" << std::endl;
-    // std::cout <<  "config_.clip_obs: [" << config_.clip_obs << "]" << std::endl;
-
     // Build observation vector using fluent API
     TensorBuilder(obs_vec_)
         .add(obs_.ang_vel)      // Angular velocity (3)

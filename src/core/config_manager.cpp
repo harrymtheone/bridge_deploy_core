@@ -143,17 +143,21 @@ Config ConfigManager::loadConfig(const std::string &config_path,
     // Populate control vectors (joints are already in order)
     for (size_t i = 0; i < num_joints; ++i) {
         const auto &joint = joints[i];
-        config.control.rl_kp[i] = joint["rl_kp"].as<float>();
-        config.control.rl_kd[i] = joint["rl_kd"].as<float>();
-        config.control.fixed_kp[i] = joint["control_kp"].as<float>();
-        config.control.fixed_kd[i] = joint["control_kd"].as<float>();
-        config.control.default_dof_pos[i] = joint["default_pos"].as<float>();
+        config.control.rl_kp[i] = require<float>(joint, "rl_kp", "joint");
+        config.control.rl_kd[i] = require<float>(joint, "rl_kd", "joint");
+        config.control.fixed_kp[i] = require<float>(joint, "control_kp", "joint");
+        config.control.fixed_kd[i] = require<float>(joint, "control_kd", "joint");
+        config.control.default_dof_pos[i] = require<float>(joint, "default_pos", "joint");
     }
 
     // Transition times
     auto ctrl_node = requireNode(yaml, "control", "config");
     config.control.stand_up_time = require<float>(ctrl_node, "stand_up_time", "control");
     config.control.sit_down_time = require<float>(ctrl_node, "sit_down_time", "control");
+    
+    // Visualization
+    config.control.publish_tf = require<bool>(ctrl_node, "publish_tf", "control");
+    config.control.publish_joint_states = require<bool>(ctrl_node, "publish_joint_states", "control");
 
     // ==================== Safety Configuration ====================
     auto safety_node = requireNode(yaml, "safety", "config");

@@ -45,6 +45,7 @@ RLController::RLController(const rclcpp::Node::SharedPtr &node,
     joy_sub_ = node_->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 10, std::bind(&RLController::joystickCallback, this, std::placeholders::_1));
 
+    joint_state_pub_ = node_->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
 
     RCLCPP_INFO(node_->get_logger(), "RLController initialized with algorithm: %s",
@@ -62,8 +63,16 @@ void RLController::start() {
     rl_timer_ = node_->create_wall_timer(std::chrono::duration<double>(rl_dt),
                                          std::bind(&RLController::rlLoop, this));
 
-    RCLCPP_INFO(node_->get_logger(), "RLController started (control: %.1f Hz, RL: %.1f Hz)",
-                1.0 / control_dt, 1.0 / rl_dt);
+    // Visualization timer at 50Hz for RViz (optional)
+    if (config_.control.publish_tf || config_.control.publish_joint_states) {
+        viz_timer_ = node_->create_wall_timer(std::chrono::milliseconds(20),
+                                              std::bind(&RLController::visualizationLoop, this));
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "RLController started (control: %.1f Hz, RL: %.1f Hz, TF: %s, JointStates: %s)",
+                1.0 / control_dt, 1.0 / rl_dt,
+                config_.control.publish_tf ? "on" : "off",
+                config_.control.publish_joint_states ? "on" : "off");
 }
 
 void RLController::stop() {
@@ -71,6 +80,8 @@ void RLController::stop() {
         control_timer_->cancel();
     if (rl_timer_)
         rl_timer_->cancel();
+    if (viz_timer_)
+        viz_timer_->cancel();
 
     RCLCPP_INFO(node_->get_logger(), "RLController stopped");
 }
@@ -81,16 +92,12 @@ void RLController::controlLoop() {
     // Update state machine
     state_machine_->update(config_.algorithm.dt);
 
-    // Get current robot state (for transitions that need it)
-    // RobotState robot_state = robot_interface_->getState();
-
     // Compute command based on current state
     State current_state = state_machine_->getState();
 
     switch (current_state) {
     case State::IDLE:
-        // Do not control the robot - but still publish TF for visualization
-        publishTF();
+        // Do not control the robot
         return;
 
     case State::STANDING_UP:
@@ -113,9 +120,6 @@ void RLController::controlLoop() {
 
     // Send command to robot
     robot_interface_->sendCommand(current_command_);
-
-    // Publish TF
-    publishTF();
 }
 
 void RLController::rlLoop() {
@@ -283,6 +287,15 @@ void RLController::computeSitDownCommand() {
     }
 }
 
+void RLController::visualizationLoop() {
+    if (config_.control.publish_tf) {
+        publishTF();
+    }
+    if (config_.control.publish_joint_states) {
+        publishJointStates();
+    }
+}
+
 void RLController::publishTF() {
     RobotState robot_state = robot_interface_->getState();
 
@@ -302,6 +315,27 @@ void RLController::publishTF() {
     transform.transform.rotation.z = -robot_state.imu.quaternion[3];
 
     tf_broadcaster_->sendTransform(transform);
+}
+
+void RLController::publishJointStates() {
+    RobotState robot_state = robot_interface_->getState();
+
+    sensor_msgs::msg::JointState joint_state_msg;
+    joint_state_msg.header.stamp = node_->now();
+    joint_state_msg.name = config_.robot.joint_names;
+
+    size_t num_joints = config_.robot.joint_names.size();
+    joint_state_msg.position.resize(num_joints);
+    joint_state_msg.velocity.resize(num_joints);
+    joint_state_msg.effort.resize(num_joints);
+
+    for (size_t i = 0; i < num_joints; ++i) {
+        joint_state_msg.position[i] = robot_state.motor.q[i];
+        joint_state_msg.velocity[i] = robot_state.motor.dq[i];
+        joint_state_msg.effort[i] = robot_state.motor.tau_est[i];
+    }
+
+    joint_state_pub_->publish(joint_state_msg);
 }
 
 bool RLController::checkSafetyLimits(const RobotState &robot_state, const RobotCommand &command) {
